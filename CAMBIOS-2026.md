@@ -69,7 +69,8 @@ Algunas celdas dan un error a propósito para explicar algo (por ejemplo, qué e
 Aquí no ha cambiado ninguna librería: son fallos del código del curso que enseñaban algo mal. **Lo que
 verás en pantalla será distinto del vídeo**, y está explicado en cada punto. Comprobado: los capítulos 4, 5 y 6 se han
 vuelto a ejecutar enteros con `requirements.txt` y la réplica de Yahoo de arriba (todos sin error). Las
-cifras de antes y después salen de Yahoo Finance real, descargado el 19 de noviembre de 2026, y de los CSV del repositorio. El capítulo 7 (MetaTrader 5) **no se ha ejecutado** (solo Windows).
+cifras de antes y después salen de Yahoo Finance real, descargado el 19 de noviembre de 2026, y de los CSV del repositorio. El capítulo 7 (MetaTrader 5) **no se ha ejecutado** (solo Windows): se ha
+comprobado que todas sus celdas compilan y, con un MetaTrader 5 simulado, lo que dice el punto 4.
 Los notebooks conservan la salida guardada del vídeo: en las celdas de estos puntos, lo guardado es el
 resultado antiguo (por ejemplo, `Alpha: 0.9 %`); al ejecutarlas, sale el nuevo.
 
@@ -100,7 +101,7 @@ recibe lo mismo.
 | Google 2004–2020 (beta 0,965), celda 13 | 0,9 % | **17,2 %** |
 | `BackTest(return_serie)`, celda 21 | 0,918 % | 17,231 % |
 | `BackTest(..., 52)` sobre los CSV de cripto (beta 0,106), cap. 4, celda 25 | 13,415 % | 14,653 % |
-| Random Forest, 5 criptos, cap. 5, celda 32 | 3,906 / 2,085 / 6,047 / 0,0 / 12,475 % | 3,929 / 2,029 / 6,032 / 0,0 / 13,057 % |
+| Random Forest, 5 criptos, cap. 5, celda 32 (sin el arreglo del punto 2) | 3,906 / 2,085 / 6,047 / 0,0 / 12,475 % | 3,929 / 2,029 / 6,032 / 0,0 / 13,057 % |
 | Breakout, 5 criptos, cap. 6, celda 9 | 11,248 / 12,17 / 17,555 / 18,129 / 5,999 % | 10,953 / 13,277 / 17,56 / 17,847 / 6,118 % |
 | Carteras, cap. 6, celdas 12 y 14 | 13,469 / 13,935 % | 13,529 / 13,958 % |
 
@@ -110,10 +111,72 @@ Alfa no mide seguridad: es la rentabilidad que se obtiene por encima de la que t
 mercado asumido (beta). Con beta cercana a 0 apenas cambia; con beta cercana a 1, el cálculo antiguo daba
 casi 0 fuera cual fuera el alfa real.
 
-### 2. Capítulo 7 (MetaTrader 5): avisos (sin ejecutar)
+### 2. `RandomForest` usaba siempre 10 días (capítulo 5, celda 31)
+
+**En el vídeo** («Automatización y otros ejemplos»): la celda 32 llama a `RandomForest(..., lag=7)`, «una
+semana», y propone probar con otros lags (10, 15 días).
+
+**Qué estaba mal:** el `feature_engineering` de dentro de `RandomForest` empezaba con `lag = 10`, que pisaba
+el valor recibido. Las variables (retorno a `lag` días, volatilidades e Ichimoku) y la `dummy` salían
+siempre a 10 días, y el retorno de la estrategia sí usaba 7. Cambiar el lag de la llamada no cambiaba las
+variables. Comprobado: con `lag=7`, `returns_lag` era igual a `pct_change(10)`.
+
+**Ahora:** esa línea está comentada (`# lag = 10`) y la función usa el lag con el que se la llama.
+
+**Qué cambia en los números** (celda 32, CSV del repositorio, test = último 10 %; el alfa, con el 52 del
+vídeo, ver «Erratas del vídeo»):
+
+| Cripto | Alfa antes | Alfa ahora | Retorno acumulado del test antes | Ahora | Días con retorno antes / ahora |
+|---|---|---|---|---|---|
+| BTC | 3,929 % | −0,008 % | 20,57 % | −0,04 % | 16 / 1 |
+| ETH | 2,029 % | 1,118 % | 6,70 % | 3,48 % | 10 / 1 |
+| LTC | 6,032 % | 4,811 % | 33,82 % | 26,91 % | 26 / 26 |
+| ETC | 0,0 % | 0,0 % | 0 % | 0 % | 0 / 0 |
+| XMR | 13,057 % | 10,08 % | 20,02 % | 15,78 % | 38 / 43 |
+
+Con los 7 días del vídeo, el modelo casi no compra BTC ni ETH en el test, y la frase «no hay ninguna que
+tenga un retorno negativo» deja de cumplirse por poco en BTC.
+
+### 3. La clase `MT5` del capítulo 7 no se podía ejecutar (celda 0)
+
+**En el vídeo:** se ejecuta la celda con la clase `MT5` (`get_data`, `orders`, `resume`, `run` y
+`close_all_night`) y se colocan órdenes con ella.
+
+**Qué estaba mal:** en el notebook, `orders` tenía tres sangrías desalineadas (dos `else:` con 7 y 11
+espacios y el `order_send` del cierre con 12). La celda daba `IndentationError` en la línea 69 antes de
+definir nada, y así está desde que se subió el notebook (noviembre de 2022).
+
+**Ahora:** cinco líneas re-sangradas. No cambia ninguna instrucción: la clase es idéntica (el mismo árbol
+sintáctico) a la de los cursos de trading con Machine Learning y con Deep Learning. Comprobado: todas las
+celdas del notebook compilan. Ejecutarlo sigue necesitando Windows con MetaTrader 5.
+
+### 4. Capítulo 7 (MetaTrader 5): avisos (sin ejecutar)
 
 - **Avisos, sin cambiar el código:** hay un comentario en `filling_mode - 1` (en la celda 0 del notebook) y otro en
   el `while True` de la celda 1. `filling_mode` es una máscara de bits del broker: restarle 1 solo acierta si el
   símbolo admite un único modo de ejecución, y si no, la orden puede rechazarse. El bucle no tiene ninguna
   pausa: repite la ronda durante todo el segundo de arranque y luego da vueltas sin parar. Opera
   siempre en una **cuenta demo**, y empieza con `live = False`.
+- **Un solo contador para todas las criptos** (`order_duration`, celda 1, con un comentario). Es una variable
+  global: si BTC da señal, pasa a 7, y las cuatro criptos que vienen detrás en la misma ronda heredan 6, 5, 4
+  y 3, así que también se compran. Comprobado con un MetaTrader 5 simulado (BTC con ruptura y el resto
+  planas: compra las cinco). Si operas varias criptos, lleva un contador por símbolo (por ejemplo, un
+  diccionario). El código no se ha cambiado porque no se ha podido probar contra MetaTrader 5.
+
+## Erratas del vídeo (el código no cambia)
+
+- **Anualizar con 52** («Probando el backtesting de nuestra estrategia», capítulos 4, 5 y 6). El vídeo dice
+  que con `duration=7` los datos pasan a ser semanales y usa `BackTest(..., 52)`. No es así: la serie sigue
+  teniendo una fila por día (BTC: 2.840 filas, unas 316 al año) y `BackTest` anualiza la media por fila.
+  Con 52 sale unas cinco veces menos de lo que toca. En el breakout de BTC, la media por fila × 252 da
+  0,52, × 52 da 0,11, y la suma real por año es 0,66. El «54,5 %» que el vídeo descarta por demasiado alto
+  estaba más cerca del valor real que el «11 %» que da por lógico. Las cifras de alfa de esta página
+  siguen calculadas con 52, como en el vídeo.
+- **Percentil de la `dummy`** (capítulo 5, celdas 14 y 31). El percentil 67 se calcula con toda la serie,
+  test incluido, aunque el vídeo hable del conjunto de entrenamiento. Lo correcto es calcularlo solo con el
+  entrenamiento, para que el test no influya en cómo se etiqueta.
+- **`count` de la cartera** (capítulo 6, celdas 12 y 14). El vídeo dice que cuenta cuántas criptos tienen
+  un retorno distinto de cero ese día. El código cuenta cuántas tienen dato ese día
+  (`shape[1] - isna().sum(axis=1)`), es decir, reparte por igual entre las criptos que existen, estén
+  operando o no. Lo que hace el código es lo prudente: repartir solo entre las que operan metería todo el
+  capital en una sola cripto los días en que solo opera una.
